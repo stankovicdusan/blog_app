@@ -14,22 +14,12 @@ class PostController extends Controller
      */
     public function index()
     {
-        $blogs = Post::latest();
+        $blogs = Post::all();
 
-        return [
-            "status" => 200,
-            "data" => $blogs
-        ];
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function create()
-    {
-        //
+        return response()->json([
+            'success' => true,
+            'data'    => $blogs,
+        ], 200);
     }
 
     /**
@@ -40,29 +30,36 @@ class PostController extends Controller
      */
     public function store(Request $request)
     {
-        //
-    }
+        $this->validate($request, [
+            'title'       => 'required',
+            'description' => 'required',
+            'slug'        => 'unique:posts',
+        ]);
+ 
+        $post              = new Post();
+        $post->title       = $request->title;
+        $post->description = $request->description;
+        $post->user_id     = auth()->user()->id;
 
-    /**
-     * Display the specified resource.
-     *
-     * @param  \App\Models\Post  $post
-     * @return \Illuminate\Http\Response
-     */
-    public function show(Post $post)
-    {
-        //
-    }
+        $slug = $request->slug;
+        if (null === $slug) {
+            $slug = strtolower(implode('-', explode(' ', $request->title)));
+        }
 
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  \App\Models\Post  $post
-     * @return \Illuminate\Http\Response
-     */
-    public function edit(Post $post)
-    {
-        //
+        $post->slug = $slug;
+
+        try {
+            $post->save();
+
+            return response()->json([
+                'success' => true,
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }  
     }
 
     /**
@@ -74,7 +71,40 @@ class PostController extends Controller
      */
     public function update(Request $request, Post $post)
     {
-        //
+        if ($post->user_id !== auth()->user()->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only user who published post can update it.'
+            ], 400);
+        }
+
+        $this->validate($request, [
+            'title'       => 'required',
+            'description' => 'required',
+            'slug'        => 'unique:posts',
+        ]);
+
+        $data = [
+            'title'       => $request->title,
+            'description' => $request->description,
+        ];
+
+        if (null !== $request->slug) {
+            $data['slug'] = $request->slug;
+        }
+ 
+        try {
+            $post->update($data);
+
+            return response()->json([
+                'success' => true
+            ], 204);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**
@@ -85,6 +115,24 @@ class PostController extends Controller
      */
     public function destroy(Post $post)
     {
-        //
+        if ($post->user_id !== auth()->user()->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only user who published post can remove it.'
+            ], 400);
+        }
+ 
+        try {
+            $post->delete();
+
+            return response()->json([
+                'success' => true,
+            ], 204);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
     }
 }
